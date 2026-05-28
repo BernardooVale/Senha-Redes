@@ -44,6 +44,7 @@ def monta_err(numseq: int) -> bytes:
     return _monta(ERR, numseq)
 
 def parse(dados: bytes) -> dict | None:
+    
     if len(dados) not in (TAMANHO_CURTO, TAMANHO_LONGO):
         return None
 
