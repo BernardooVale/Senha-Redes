@@ -99,6 +99,8 @@ class Servidor:
         cliente['ultima_resposta'] = resp
         cliente['ultimo_tipo'] = protocolo.TRY
         cliente['numseq_esperado'] += 1
+        if tentativasRestantes == 0:
+            cliente['fase'] = 'BYE'
         return
     
     def _processa_bye(self, msg, endereco, cliente):
@@ -138,6 +140,16 @@ class Servidor:
 
             cliente = clientes[endereco]
 
+            if (
+                cliente['fase'] == 'HEL'
+                and cliente['ultimo_tipo'] == protocolo.HEL
+                and cliente['ultima_resposta']
+                and msg['tipo'] == protocolo.HEL
+                and msg['numseq'] == 0
+            ):
+                self.sock.sendto(cliente['ultima_resposta'], endereco)
+                continue
+
             # duplicata -> reenvia
             if (
                 cliente['ultima_resposta']
@@ -147,12 +159,14 @@ class Servidor:
                 self.sock.sendto(cliente['ultima_resposta'], endereco)
                 continue
 
-            if msg['tipo'] == protocolo.BYE and cliente['fase'] in ('HEL', 'TRY'):
+            if msg['tipo'] == protocolo.BYE and cliente['fase'] in ('HEL', 'TRY', 'BYE'):
                 clientesFinalizados += self._processa_bye(msg, endereco, cliente)
             elif cliente['fase'] == 'HEL':
                 self._processa_hel(msg, endereco, cliente)
             elif cliente['fase'] == 'TRY':
                 self._processa_try(msg, endereco, cliente)
+            elif cliente['fase'] == 'BYE':
+                self._processa_bye(msg, endereco, cliente)
 
         self.sock.close()
 

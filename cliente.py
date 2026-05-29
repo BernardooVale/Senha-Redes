@@ -65,7 +65,15 @@ class Cliente:
 			except (StopIteration, EOFError):
 				self.encerrar(self.ultimo_numseq)
 
-			digitos = [int(c) for c in linha.strip()]
+			texto = linha.strip()
+			try:
+				digitos = [int(c) for c in texto]
+			except ValueError:
+				continue
+
+			if not texto:
+				continue
+
 			resposta = self._envia_e_recebe(
 				protocolo.monta_try(self.proximo_numseq, digitos)
 			)
