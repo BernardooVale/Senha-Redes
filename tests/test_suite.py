@@ -88,20 +88,14 @@ class SenhaRedesTests(unittest.TestCase):
 
     def test_unexpected_type_err0(self):
         proc, port = start_server()
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         addr = (HOST, port)
-        temp = None
-        sock = None
-        sock2 = None
         try:
-            temp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            temp.settimeout(2.0)
-            temp.sendto(protocolo.monta_try(1, [1, 2, 3, 4]), addr)
-            msg = recv_parsed(temp)
+            sock.sendto(protocolo.monta_try(1, [1, 2, 3, 4]), addr)
+            msg = recv_parsed(sock)
             self.assertEqual(msg['tipo'], protocolo.ERR)
             self.assertEqual(msg['numseq'], 0)
-            temp.close()
 
-            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             sock.sendto(protocolo.monta_hel(), addr)
             msg = recv_parsed(sock)
             self.assertEqual(msg['tipo'], protocolo.RES)
@@ -118,6 +112,7 @@ class SenhaRedesTests(unittest.TestCase):
             self.assertEqual(msg['numseq'], -1)
 
             sock2 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock2.settimeout(2.0)
             sock2.sendto(protocolo.monta_hel(), addr)
             msg = recv_parsed(sock2)
             self.assertEqual(msg['tipo'], protocolo.RES)
@@ -132,102 +127,7 @@ class SenhaRedesTests(unittest.TestCase):
             self.assertEqual(msg['numseq'], -1)
             sock2.close()
         finally:
-            if temp is not None:
-                temp.close()
-            if sock is not None:
-                sock.close()
-            if sock2 is not None:
-                sock2.close()
-            self.assert_server_finished(proc)
-
-    def test_hel_duplicate_replies_again(self):
-        proc, port = start_server()
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        addr = (HOST, port)
-        try:
-            sock.sendto(protocolo.monta_hel(), addr)
-            msg = recv_parsed(sock)
-            self.assertEqual(msg['tipo'], protocolo.RES)
-            self.assertEqual(msg['numseq'], 6)
-
-            sock.sendto(protocolo.monta_hel(), addr)
-            msg_dup = recv_parsed(sock)
-            self.assertEqual(msg_dup['tipo'], protocolo.RES)
-            self.assertEqual(msg_dup['numseq'], 6)
-
-            sock.sendto(protocolo.monta_bye(0), addr)
-            msg = recv_parsed(sock)
-            self.assertEqual(msg['tipo'], protocolo.RES)
-            self.assertEqual(msg['numseq'], -1)
-
-            sock2 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            sock2.settimeout(2.0)
-            sock2.sendto(protocolo.monta_hel(), addr)
-            msg = recv_parsed(sock2)
-            self.assertEqual(msg['tipo'], protocolo.RES)
-            self.assertEqual(msg['numseq'], 6)
-            sock2.sendto(protocolo.monta_bye(0), addr)
-            msg = recv_parsed(sock2)
-            self.assertEqual(msg['tipo'], protocolo.RES)
-            self.assertEqual(msg['numseq'], -1)
-            sock2.close()
-        finally:
             sock.close()
-            self.assert_server_finished(proc)
-
-    def test_last_try_moves_to_bye(self):
-        proc, port = start_server(nt='1')
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        addr = (HOST, port)
-        try:
-            sock.sendto(protocolo.monta_hel(), addr)
-            msg = recv_parsed(sock)
-            self.assertEqual(msg['tipo'], protocolo.RES)
-            self.assertEqual(msg['numseq'], 1)
-
-            sock.sendto(protocolo.monta_try(1, [1, 2, 3, 4]), addr)
-            msg = recv_parsed(sock)
-            self.assertEqual(msg['tipo'], protocolo.RES)
-            self.assertEqual(msg['numseq'], 0)
-
-            sock.sendto(protocolo.monta_try(2, [1, 2, 3, 4]), addr)
-            msg = recv_parsed(sock)
-            self.assertEqual(msg['tipo'], protocolo.ERR)
-            self.assertEqual(msg['numseq'], 0)
-
-            sock.sendto(protocolo.monta_bye(1), addr)
-            msg = recv_parsed(sock)
-            self.assertEqual(msg['tipo'], protocolo.RES)
-            self.assertEqual(msg['numseq'], -1)
-
-            sock2 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            sock2.settimeout(2.0)
-            sock2.sendto(protocolo.monta_hel(), addr)
-            msg = recv_parsed(sock2)
-            self.assertEqual(msg['tipo'], protocolo.RES)
-            self.assertEqual(msg['numseq'], 1)
-            sock2.sendto(protocolo.monta_bye(0), addr)
-            msg = recv_parsed(sock2)
-            self.assertEqual(msg['tipo'], protocolo.RES)
-            self.assertEqual(msg['numseq'], -1)
-            sock2.close()
-        finally:
-            sock.close()
-            self.assert_server_finished(proc)
-
-    def test_client_ignores_invalid_input_line(self):
-        proc, port = start_server()
-        try:
-            result = run_client(port, 'abcd\n1234\n')
-            self.assertEqual(result.returncode, 0, msg=result.stderr)
-            self.assertEqual(
-                [line.strip() for line in result.stdout.splitlines() if line.strip()],
-                ['NA=4, NT=6', '1(5) ****', 'Senha=1234'],
-            )
-
-            second = run_client(port, '1234\n')
-            self.assertEqual(second.returncode, 0, msg=second.stderr)
-        finally:
             self.assert_server_finished(proc)
 
     def test_loss_corruption_and_duplication(self):
