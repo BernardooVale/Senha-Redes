@@ -1,3 +1,5 @@
+# Bernardo Vale e Pedro Aguiar
+
 import sys
 import random
 import socket
@@ -7,6 +9,7 @@ import protocolo
 class Servidor:
     def __init__(self, porta, senha, numeroTentativas):
         self.porta = porta
+        self.tamanhoSenha = len(senha)
         self.senha = self._valida_ou_gera(senha)
         self.numeroTentativas = numeroTentativas
         self.tamanhoSenha = len(self.senha)
@@ -21,17 +24,17 @@ class Servidor:
             sys.exit(1)
 
         if all(c == '0' for c in senha): # senha aleatoria
-            digitos = random.sample(range(10), self.tamanhoSenha)
+            digitos = random.sample(range(10), len(senha))
             return [str(d) for d in digitos]
 
-        if len(set(senha)) != self.tamanhoSenha: # digitos repetidos
+        if len(set(senha)) != len(senha): # digitos repetidos
             sys.exit(1)
 
         return list(senha)
     
     def _cria_socket(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.bind('0.0.0.0', self.porta)
+        sock.bind(('0.0.0.0', self.porta))
         return sock
     
     def _processa_erro(self, codigoErro, endereco):
@@ -51,6 +54,7 @@ class Servidor:
         self.sock.sendto(resp, endereco)
 
         cliente['ultima_resposta'] = resp
+        cliente['ultimo_tipo'] = protocolo.HEL
         cliente['fase'] = 'TRY'
         cliente['numseq_esperado'] = 1
         return
@@ -93,12 +97,8 @@ class Servidor:
         self.sock.sendto(resp, endereco)
 
         cliente['ultima_resposta'] = resp
+        cliente['ultimo_tipo'] = protocolo.TRY
         cliente['numseq_esperado'] += 1
-
-        # esgotou tentativas -> força fase BYE
-        if tentativasRestantes == 0:
-            cliente['fase'] = 'BYE'
-        
         return
     
     def _processa_bye(self, msg, endereco, cliente):
@@ -112,6 +112,7 @@ class Servidor:
         self.sock.sendto(resp, endereco)
 
         cliente['ultima_resposta'] = resp
+        cliente['ultimo_tipo'] = protocolo.BYE
         cliente['fase'] = 'FIM'
         return 1
     
@@ -131,22 +132,27 @@ class Servidor:
                 clientes[endereco] = {
                     'fase': 'HEL',
                     'numseq_esperado': 0,
-                    'ultima_resposta': None
+                    'ultima_resposta': None,
+                    'ultimo_tipo': None
                 }
 
             cliente = clientes[endereco]
 
             # duplicata -> reenvia
-            if msg['numseq'] == cliente['numseq_esperado'] - 1 and cliente['ultima_resposta']:
+            if (
+                cliente['ultima_resposta']
+                and msg['tipo'] == cliente['ultimo_tipo']
+                and msg['numseq'] == cliente['numseq_esperado'] - 1
+            ):
                 self.sock.sendto(cliente['ultima_resposta'], endereco)
                 continue
 
-            if cliente['fase'] == 'HEL':
+            if msg['tipo'] == protocolo.BYE and cliente['fase'] in ('HEL', 'TRY'):
+                clientesFinalizados += self._processa_bye(msg, endereco, cliente)
+            elif cliente['fase'] == 'HEL':
                 self._processa_hel(msg, endereco, cliente)
             elif cliente['fase'] == 'TRY':
                 self._processa_try(msg, endereco, cliente)
-            elif cliente['fase'] == 'BYE':
-                clientesFinalizados += self._processa_bye(msg, endereco, cliente)
 
         self.sock.close()
 
@@ -160,6 +166,7 @@ def main():
     numeroTentativas = int(sys.argv[3])
 
     srv = Servidor(porta, senha, numeroTentativas)
+    srv.jogo()
 
 if __name__ == "__main__":
     main()

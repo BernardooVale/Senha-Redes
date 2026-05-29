@@ -1,4 +1,4 @@
-# protocolo.py
+# Bernardo Vale e Pedro Aguiar
 import struct
 
 HEL = 1
