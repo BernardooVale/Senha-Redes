@@ -1,4 +1,6 @@
-# Bernardo Vale e Pedro Aguiar
+# Bernardo Vale dos Santos Bento
+# Pedro Henrique Egito Aguiar
+
 import struct
 
 HEL = 1

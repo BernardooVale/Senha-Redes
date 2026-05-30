@@ -1,4 +1,6 @@
-# Bernardo Vale e Pedro Aguiar
+# Bernardo Vale dos Santos Bento
+# Pedro Henrique Egito Aguiar
+
 import socket
 import sys
 import time
@@ -65,7 +67,11 @@ class Cliente:
 			except (StopIteration, EOFError):
 				self.encerrar(self.ultimo_numseq)
 
-			digitos = [int(c) for c in linha.strip()]
+			try:
+				digitos = [int(c) for c in linha.strip()]
+			except ValueError:
+				continue
+
 			resposta = self._envia_e_recebe(
 				protocolo.monta_try(self.proximo_numseq, digitos)
 			)

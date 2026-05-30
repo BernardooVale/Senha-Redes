@@ -1,4 +1,5 @@
-# Bernardo Vale e Pedro Aguiar
+# Bernardo Vale dos Santos Bento
+# Pedro Henrique Egito Aguiar
 
 import sys
 import random
@@ -12,9 +13,7 @@ class Servidor:
         self.tamanhoSenha = len(senha)
         self.senha = self._valida_ou_gera(senha)
         self.numeroTentativas = numeroTentativas
-        self.tamanhoSenha = len(self.senha)
         self.sock = self._cria_socket()
-        self.NA = len(self.senha)
 
     def _valida_ou_gera(self, senha):
         if not (4 <= len(senha) <= 8): # senha muito pequena ou grande
@@ -49,7 +48,7 @@ class Servidor:
             cliente['ultima_resposta'] = self._processa_erro(0, endereco)
             return
 
-        padrao = ['?'] * self.NA + [' '] * (8 - self.NA)
+        padrao = ['?'] * self.tamanhoSenha + [' '] * (8 - self.tamanhoSenha)
         resp = protocolo.monta_res(self.numeroTentativas, padrao)
         self.sock.sendto(resp, endereco)
 
@@ -69,30 +68,30 @@ class Servidor:
             cliente['ultima_resposta'] = self._processa_erro(0, endereco)
             return
 
-        digitos = list(msg['payload'][:self.NA])
+        digitos = list(msg['payload'][:self.tamanhoSenha])
         tentativasRestantes = self.numeroTentativas - msg['numseq']
 
         # valida: valores 0-9
         if any(d > 9 for d in digitos):
-            cliente['ultima_resposta'] = self._processa_erro(tentativasRestantes, endereco)
+            cliente['ultima_resposta'] = self._processa_erro(tentativasRestantes + 1, endereco)
             return
 
         # valida: sem repetição
         if len(set(digitos)) != len(digitos):
-            cliente['ultima_resposta'] = self._processa_erro(tentativasRestantes, endereco)
+            cliente['ultima_resposta'] = self._processa_erro(tentativasRestantes + 1, endereco)
             return
 
         # calcula feedback
         senhaInt = [int(c) for c in self.senha]
         padrao = []
-        for i in range(self.NA):
+        for i in range(self.tamanhoSenha):
             if digitos[i] == senhaInt[i]:
                 padrao.append('*')
             elif digitos[i] in senhaInt:
                 padrao.append('+')
             else:
                 padrao.append('-')
-        padrao += [' '] * (8 - self.NA)
+        padrao += [' '] * (8 - self.tamanhoSenha)
         resp = protocolo.monta_res(tentativasRestantes, padrao)
         self.sock.sendto(resp, endereco)
 
@@ -107,7 +106,7 @@ class Servidor:
             cliente['ultima_resposta'] = self._processa_erro(0, endereco)
             return 0
 
-        padrao = list(self.senha) + [' '] * (8 - self.NA)
+        padrao = list(self.senha) + [' '] * (8 - self.tamanhoSenha)
         resp = protocolo.monta_res(-1, padrao)
         self.sock.sendto(resp, endereco)
 
