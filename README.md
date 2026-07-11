@@ -1,4 +1,145 @@
-# Jogo de Senha — Bernardo Vale dos Santos Bento e Pedro Henrique Egito Aguiar
+# Password Guessing Game — Bernardo Vale dos Santos Bento and Pedro Henrique Egito Aguiar
+
+## 🇺🇸 English
+
+### Files
+
+| File | Purpose |
+|---|---|
+| `protocolo.py` | Builds, parses, and validates message checksums |
+| `servidor.py` | Game logic, manages up to 2 simultaneous clients |
+| `cliente.py` | Reads guesses from stdin and prints feedback |
+
+---
+
+### How to Run
+
+```bash
+# Server
+python servidor.py <port> <password> <NT>
+
+# Client (in another terminal)
+python cliente.py <host> <port>
+```
+
+**Examples:**
+```bash
+python servidor.py 5000 3142 6   # fixed password
+python servidor.py 5000 0000 6   # random password (all zeros)
+```
+
+### Password Restrictions
+
+- 4–8 digits
+- No repeated digits
+- If all digits are `0`, the server generates a random password with unique digits
+
+---
+
+## Protocol (UDP)
+
+All messages use an XOR checksum. Two message sizes are supported:
+
+| Size | Messages |
+|---|---|
+| 4 bytes | `HEL`, `BYE`, `ERR` |
+| 12 bytes | `TRY`, `RES` |
+
+### Header Structure (4 bytes)
+
+```
++--------+--------+--------+--------+
+|  type  |   cs   |     seqnum      |
+| 1 byte | 1 byte |     2 bytes     |
++--------+--------+--------+--------+
+```
+
+- `cs` = XOR of all bytes with `cs = 0`
+- `seqnum = 0xFFFF` → interpreted as `-1` (used in the final `RES` message)
+
+### Message Types
+
+| Type | Value | Direction | Payload |
+|---|---|---|---|
+| `HEL` | 1 | Client → Server | — |
+| `TRY` | 2 | Client → Server | 8 bytes: digits (0–9) |
+| `RES` | 3 | Server → Client | 8 bytes: pattern using `*`, `+`, `-`, `?`, ` ` |
+| `BYE` | 4 | Client → Server | — |
+| `ERR` | 5 | Server → Client | — |
+
+### Feedback Pattern (`RES` payload)
+
+| Character | Meaning |
+|---|---|
+| `*` | Correct digit in the correct position |
+| `+` | Correct digit in the wrong position |
+| `-` | Digit is not present in the password |
+| `?` | Position not yet revealed (response to `HEL`) |
+| ` ` | Padding (positions beyond the password length) |
+
+`seqnum` in `RES` = remaining attempts (`-1` = BYE, password revealed)
+
+---
+
+## Game Flow
+
+```
+Client                           Server
+   |--- HEL (seqnum=0) ----------->|
+   |<-- RES (NT, "????    ") -------|
+
+   |--- TRY (seqnum=1, digits) ---->|
+   |<-- RES (NT-1, "*+-*    ") -----|
+
+   |--- TRY (seqnum=2, digits) ---->|
+   |<-- RES (NT-2, "****    ") -----|   ← no attempts left or session ended
+
+   |--- BYE (last_seqnum) --------->|
+   |<-- RES (seqnum=-1, password) --|
+```
+
+- Duplicate messages are detected and answered by resending the previous response.
+- The client retries each message up to 3 times before printing `NO RES` and terminating.
+
+---
+
+## Client Output
+
+```
+NA=4, NT=6          # password length, number of attempts
+1(5) *+-*           # attempt 1, 5 remaining, feedback
+2(4) **-*
+3(3) ****           # no attempts left or session ended
+Password=3142       # revealed after BYE
+```
+
+### Errors
+
+| Message | Cause |
+|---|---|
+| `ERROR` | `ERR` with seqnum=0 (fatal protocol error) |
+| `RETRY N` | `ERR` with seqnum>0 (invalid attempt, N attempts remaining) |
+| `NO RES` | Three consecutive timeouts without a response |
+
+---
+
+## Error Conditions (Server Sends `ERR`)
+
+| Situation | `seqnum` in `ERR` |
+|---|---|
+| Out-of-order message / invalid message type | 0 |
+| Invalid digit (>9) in a guess | Remaining attempts |
+| Repeated digits in a guess | Remaining attempts |
+
+---
+
+## Dependencies
+
+Python 3.10+ (uses `dict | None` type hints). Standard library only: `socket`, `struct`, `random`, `sys`, `time`.
+
+---
+
+# 🇧🇷 Português
 
 ## Arquivos
 
@@ -27,6 +168,7 @@ python servidor.py 5000 0000 6   # senha aleatória (todos zeros)
 ```
 
 ### Restrições da senha
+
 - 4–8 dígitos
 - Sem dígitos repetidos
 - Todos `0` → servidor gera senha aleatória com dígitos únicos
